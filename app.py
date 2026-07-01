@@ -25,7 +25,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
 
 # Shared application states, keyed by session_id
 user_states = {}
-user_states_lock = threading.Lock()
+user_states_lock = threading.RLock()
 
 def get_user_state(session_id):
     with user_states_lock:
