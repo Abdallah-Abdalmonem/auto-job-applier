@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Job Applier</title>
+    <!-- Google Fonts: Outfit (modern sans) and Fira Code (terminal) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Animated Ambient Background Mesh Glows -->
+    <div class="glass-bg-glow glow-1"></div>
+    <div class="glass-bg-glow glow-2"></div>
+    
+    <!-- Dynamic Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="container">
+        <!-- Main Header -->
+        <header>
+            <div class="logo">
+                <div class="logo-icon-wrapper">
+                    <i class="fa-solid fa-paper-plane plane-icon"></i>
+                </div>
+                <h1>Auto Job Applier</h1>
+            </div>
+            <div class="server-status" id="server-status-badge">
+                <span class="pulse-dot"></span> Server Connected
+            </div>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <main class="dashboard-grid">
+            <!-- Left Panel: SMTP Settings -->
+            <section class="card config-card">
+                <div class="card-header">
+                    <div class="header-icon-box">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <h2>SMTP & Account Settings</h2>
+                </div>
+                <form id="config-form" class="card-body">
+                    <div class="form-group">
+                        <label for="sender_email">Sender Gmail</label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-envelope input-icon"></i>
+                            <input type="email" id="sender_email" required placeholder="your.name@gmail.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="app_password">Gmail App Password</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-shield-halved input-icon"></i>
+                            <input type="password" id="app_password" required placeholder="xxxx xxxx xxxx xxxx">
+                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                                <i class="fa-regular fa-eye" id="toggle-eye"></i>
+                            </button>
+                        </div>
+                        <small class="caption-link">Generate one in your <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Google Account Security</a> settings.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sender_name">Display Sender Name</label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-user input-icon"></i>
+                            <input type="text" id="sender_name" required placeholder="Abdallah Abdalmonem">
+                        </div>
+                    </div>
+
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="min_delay">Min Delay (s)</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-hourglass-start input-icon"></i>
+                                <input type="number" id="min_delay" required min="1" max="600" value="30">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_delay">Max Delay (s)</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-hourglass-end input-icon"></i>
+                                <input type="number" id="max_delay" required min="1" max="600" value="90">
+                            </div>
+                        </div>
+                    </div>
+                    <small class="caption-text">A random wait between these values occurs after each email is sent.</small>
+
+                    <div class="form-group margin-top-15">
+                        <label for="default_position">Default Job Title</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-briefcase input-icon"></i>
+                            <input type="text" id="default_position" placeholder="e.g. Senior Flutter Developer">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="save-config-btn">
+                        <i class="fa-solid fa-save"></i> Save Settings
+                    </button>
+                </form>
+            </section>
+
+            <!-- Right Panel: Uploads & Control -->
+            <section class="card upload-card">
+                <div class="card-header">
+                    <div class="header-icon-box">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <h2>Files & Execution Panel</h2>
+                </div>
+                <div class="card-body uploads-container">
+                    
+                    <!-- Contacts File Upload Card -->
+                    <div class="upload-card-wrapper" id="xlsx-zone" onclick="document.getElementById('xlsx-input').click()">
+                        <input type="file" id="xlsx-input" class="hidden-file-input" accept=".xlsx,.csv" onchange="uploadSelectedFile(this, 'xlsx')">
+                        <div class="upload-icon-circle green">
+                            <i class="fa-solid fa-file-csv"></i>
+                        </div>
+                        <div class="upload-details">
+                            <h3>Excel or CSV Contacts Sheet</h3>
+                            <p id="xlsx-filename">Click or drag & drop to upload</p>
+                        </div>
+                    </div>
+
+                    <!-- PDF Resume Upload Card -->
+                    <div class="upload-card-wrapper" id="resume-zone" onclick="document.getElementById('resume-input').click()">
+                        <input type="file" id="resume-input" class="hidden-file-input" accept=".pdf" onchange="uploadSelectedFile(this, 'resume')">
+                        <div class="upload-icon-circle red">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <div class="upload-details">
+                            <h3>Resume Attachment (PDF)</h3>
+                            <p id="resume-filename">Click or drag & drop to upload</p>
+                        </div>
+                    </div>
+
+                    <!-- PDF Cover Letter Upload Card -->
+                    <div class="upload-card-wrapper" id="cover-zone" onclick="document.getElementById('cover-input').click()">
+                        <input type="file" id="cover-input" class="hidden-file-input" accept=".pdf" onchange="uploadSelectedFile(this, 'cover_letter')">
+                        <div class="upload-icon-circle blue">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                        <div class="upload-details">
+                            <h3>Cover Letter Attachment (PDF)</h3>
+                            <p id="cover-filename">Click or drag & drop to upload (Optional)</p>
+                        </div>
+                    </div>
+
+                    <!-- App Control Section -->
+                    <div class="control-panel">
+                        <div class="control-settings-row">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" id="dry_run_check" checked>
+                                <label for="dry_run_check">
+                                    <span class="custom-checkbox"></span>
+                                    Dry Run Mode (Preview Only)
+                                </label>
+                            </div>
+                            <div class="limit-input-group">
+                                <label for="email_limit">Limit Sent:</label>
+                                <input type="number" id="email_limit" min="0" placeholder="0 (unlimited)" value="0">
+                            </div>
+                        </div>
+
+                        <div class="button-row">
+                            <button type="button" class="btn btn-success" id="start-btn" onclick="startExecution()">
+                                <i class="fa-solid fa-rocket"></i> Start Application Job
+                            </button>
+                            <button type="button" class="btn btn-danger hidden" id="stop-btn" onclick="stopExecution()">
+                                <i class="fa-solid fa-circle-stop"></i> Stop Sending
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </main>
+
+        <!-- Progress and Monitor (Full Width Bottom Area) -->
+        <section class="card progress-card margin-top-25 hidden" id="progress-section">
+            <div class="card-header progress-header">
+                <div class="header-left">
+                    <div class="header-icon-box purple">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <h2>Live Execution Monitor</h2>
+                </div>
+                <div class="status-indicator" id="task-status-text">RUNNING</div>
+            </div>
+            
+            <div class="card-body">
+                <!-- Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-box bg-purple">
+                        <div class="metric-icon-overlay"><i class="fa-solid fa-users"></i></div>
+                        <span class="metric-num" id="stat-total">0</span>
+                        <span class="metric-lbl">Total Recipients</span>
+                    </div>
+                    <div class="metric-box bg-green">
+                        <div class="metric-icon-overlay"><i class="fa-solid fa-circle-check"></i></div>
+                        <span class="metric-num" id="stat-sent">0</span>
+                        <span class="metric-lbl">Sent Successfully</span>
+                    </div>
+                    <div class="metric-box bg-yellow">
+                        <div class="metric-icon-overlay"><i class="fa-solid fa-ban"></i></div>
+                        <span class="metric-num" id="stat-skipped">0</span>
+                        <span class="metric-lbl">Skipped</span>
+                    </div>
+                    <div class="metric-box bg-red">
+                        <div class="metric-icon-overlay"><i class="fa-solid fa-circle-exclamation"></i></div>
+                        <span class="metric-num" id="stat-failed">0</span>
+                        <span class="metric-lbl">Failed</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                    <span class="progress-percent" id="progress-percent-lbl">0%</span>
+                </div>
+
+                <!-- Live Log Terminal & Records Grid Split -->
+                <div class="split-view">
+                    <!-- macOS-Style Terminal Logs -->
+                    <div class="terminal-panel">
+                        <div class="terminal-header">
+                            <div class="terminal-buttons">
+                                <span class="dot close"></span>
+                                <span class="dot minimize"></span>
+                                <span class="dot expand"></span>
+                            </div>
+                            <div class="terminal-title">python send_applications.py logs</div>
+                        </div>
+                        <div class="console-box" id="console-logs">
+                            <!-- Live console logging output -->
+                        </div>
+                    </div>
+
+                    <!-- Clean Table Panel -->
+                    <div class="records-panel">
+                        <div class="table-container">
+                            <table id="recipients-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email Address</th>
+                                        <th>Company</th>
+                                        <th>Position</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recipients-tbody">
+                                    <tr>
+                                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding: 2rem 0;">
+                                            No application logs loaded.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Core Script -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

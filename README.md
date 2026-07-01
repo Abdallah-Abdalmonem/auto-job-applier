@@ -1,115 +1,103 @@
-# Job Application Email Sender
+# Auto Job Applier
 
-Reads an Excel sheet of recipient emails and sends job application emails via Gmail SMTP. Automatically skips addresses marked as blocked, spam, bounced, or already sent. Includes rate limiting to avoid triggering spam filters.
+A smart, rate-limited job application automation tool. It reads recipient emails from an Excel (`.xlsx`) or CSV (`.csv`) file and sends personalized job applications via Gmail SMTP. 
 
-## Files
+It includes a beautiful, local **Web Dashboard** for drag-and-drop asset management and real-time execution tracking, in addition to the standard command-line script.
 
-| File | Purpose |
+---
+
+## 🚀 Features
+
+- **Web Dashboard:** A premium glassmorphic dark-mode web page to upload files, save settings, and track live email sends.
+- **Excel & CSV Support:** Parses contacts lists with or without headers (auto-detects structure).
+- **Dynamic Formatting:** If the company name is missing, the email template automatically cleans itself up (e.g. `Dear Hiring Team` instead of `Dear Hiring Team at `).
+- **Default Position:** Set a fallback job title in configuration or via command line.
+- **Spam Avoidance:** Adds random rate-limiting delays (30–90 seconds) between sends.
+- **Attachment Support:** Attaches your Resume and Cover Letter automatically.
+
+---
+
+## 📂 Project Structure
+
+| File / Folder | Purpose |
 |---|---|
-| `send_applications.py` | Main script — reads Excel, sends emails |
-| `create_sample_excel.py` | Generates `emails.xlsx` with sample data |
-| `emails.xlsx` | Your email list (edit this with real data) |
-| `config.ini` | Your Gmail credentials and settings |
-| `resume.pdf` | Your resume (place in this folder) |
-| `cover_letter.pdf` | Your cover letter (place in this folder) |
+| `send_applications.py` | Command-line script to send emails |
+| `app.py` | Local Flask Web Server (Web Dashboard) |
+| `templates/`, `static/` | Frontend HTML, CSS, and JS for the dashboard |
+| `config.ini` | Gmail credentials, delays, and default settings |
+| `emails.xlsx` / `emails.csv` | List of recipient emails |
+| `resume.pdf` / `cover_letter.pdf` | Attached PDF documents |
 
-## Setup
+---
 
-### 1. Install Python dependencies
+## 🛠️ Setup & Installation
 
+### 1. Install Dependencies
+Install Flask (for the dashboard) and openpyxl (for Excel files):
 ```bash
-pip install openpyxl
+pip install Flask openpyxl
 ```
 
 ### 2. Generate a Gmail App Password
+Gmail SMTP requires a **16-character App Password** (not your regular Gmail password):
+1. Go to your [Google Account Security Settings](https://myaccount.google.com/security).
+2. Enable **2-Step Verification** if it isn't already.
+3. Search for **App passwords** (or go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)).
+4. Create a new app (e.g. select "Other", name it "Job Applier") and click **Create**.
+5. Copy the generated 16-character password.
 
-Gmail requires an App Password (not your regular password) for SMTP access:
+---
 
-1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-2. Sign in if needed
-3. Select app: **Mail**, Select device: **Other** → name it "Job Script"
-4. Click **Generate** — copy the 16-character password
+## 💻 Web Dashboard Usage (Recommended)
 
-> If you don't see the App Password option, you need to enable 2-Step Verification first (under Security → 2-Step Verification).
+1. Start the local server:
+   ```bash
+   python app.py
+   ```
+2. Open **[http://127.0.0.1:5000](http://127.0.0.1:5000)** in your browser.
+3. Configure your SMTP Settings and Gmail details.
+4. Drag & drop your files (Contacts sheet, Resume PDF, Cover Letter PDF).
+5. Tick **Dry Run Mode** to test first, then click **Start Job Applier** to view live progress!
 
-### 3. Configure `config.ini`
+---
 
-Open `config.ini` and fill in:
+## 🐚 Command Line Usage
 
-- `sender_email` — your Gmail address
-- `app_password` — the 16-character App Password (spaces are fine)
-- `sender_name` — your full name as you want recipients to see it
-- `resume_path` — path to your resume file (e.g., `resume.pdf`)
-- `cover_letter_path` — path to your cover letter (leave empty `""` if none)
-- `min_delay` / `max_delay` — random delay range in seconds between emails
+If you prefer to run it directly from the terminal, configuration is read from `config.ini`.
 
-### 4. Prepare your Excel sheet
-
-Open `emails.xlsx` and fill in your data. The columns are:
-
-| Column | Required | Description |
-|---|---|---|
-| **email** | Yes | Recipient's email address |
-| **company** | Yes | Company name (used in the email body) |
-| **position** | Yes | Job title (used in subject and body) |
-| **status** | No | Leave blank to send, or set to: `spam`, `blocked`, `sent`, `replied`, `skip` |
-| **notes** | No | Your personal notes (not sent) |
-
-Rows with a status of `spam`, `blocked`, `sent`, `replied`, or `skip` are automatically skipped. This is how you prevent sending to addresses that blocked you or marked you as spam.
-
-### 5. Place your files
-
-Put your `resume.pdf` and `cover_letter.pdf` in this folder (or update the paths in `config.ini`).
-
-## Usage
-
-### Preview first (dry run — no emails sent)
-
+### Run a Dry Run (Recommended first step)
 ```bash
 python send_applications.py --dry-run
 ```
+*Shows a terminal preview of the first email's subject and body, and logs skipped addresses.*
 
-This shows you exactly which emails would be sent and which would be skipped, without actually sending anything.
-
-### Send emails
-
+### Run Actual Application Send
 ```bash
 python send_applications.py
 ```
 
-### Use a different Excel file or config
+### Advanced CLI Arguments
+- `--xlsx file.csv` — Specify a custom Excel or CSV contact sheet.
+- `--position "Backend Engineer"` — Override the job title for all applications.
+- `--limit 10` — Stop sending after 10 successful emails.
+- `--config custom.ini` — Use a different configuration file.
 
-```bash
-python send_applications.py --xlsx my_list.csv --config my_config.ini
-```
+---
 
-### Limit the number of emails sent
+## 📊 Sheet Structure (`emails.xlsx` or `emails.csv`)
+If your file has a header row, the columns will be automatically mapped. If it doesn't, the script assumes **Column 1 is the Email** and **Column 2 is the Position** (if exists).
 
-```bash
-python send_applications.py --limit 5
-```
+| Column | Required | Description |
+|---|---|---|
+| **email** | **Yes** | Recipient's email address |
+| **position** | No | Job title (defaults to `default_position` in config) |
+| **company** | No | Company name (used in email body) |
+| **status** | No | Skip value: set to `sent`, `blocked`, `spam` to ignore |
+| **notes** | No | Internal notes (ignored by script) |
 
-Useful for testing — sends only the first 5 eligible emails and stops.
+---
 
-## How spam avoidance works
+## ⚠️ Troubleshooting
+- **"Authentication failed":** Double-check your App Password in `config.ini` or the Web Dashboard. Make sure it doesn't contain spaces and you copied all 16 characters.
+- **SMTP Connection Error:** Make sure your internet connection is active and that your network does not block port 465 (common on some public WiFi networks or corporate firewalls).
 
-- **Rate limiting**: A random delay (30–90 seconds by default) is added between each email. This mimics human behaviour and avoids Gmail's rate limits.
-- **Status tracking**: Any address that blocks you or marks you as spam should be marked with `blocked` or `spam` in the Excel sheet. The script will skip them on subsequent runs.
-- **Recipient refusal detection**: If Gmail refuses a recipient (e.g., the address is invalid or has blocked you), the script catches the error and reports it without crashing.
-
-## Typical workflow
-
-1. Add new recipients to `emails.xlsx` with an empty status
-2. Run `--dry-run` to verify the list
-3. Run the script to send
-4. After a few days, update statuses for bounced/blocked/spam addresses
-5. Run again for new batches
-
-## Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| "Authentication failed" | Double-check your App Password in `config.ini`. Make sure you're using an App Password, not your regular Gmail password. |
-| "openpyxl is required" | Run `pip install openpyxl` |
-| Emails going to recipient's spam | Make sure your email body looks natural. Customise the template in `send_applications.py`. Also ensure your Gmail account is warmed up (has been sending normal emails). |
-| "Connection refused" | Check your internet connection. Some networks block port 465 — try a different network or VPN. |
