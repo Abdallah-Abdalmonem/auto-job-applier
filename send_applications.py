@@ -38,35 +38,111 @@ def load_config(config_path: str) -> dict:
     for key in required:
         if key not in g:
             raise ValueError(f"Missing required key '{key}' in [gmail] section")
+            
+    def get_clean(key, default=""):
+        val = g.get(key, default)
+        if val is not None:
+            val = str(val).strip().strip("'\"").strip()
+        return val
+        
     return {
-        "sender_email": g["sender_email"],
-        "app_password": g["app_password"],
-        "sender_name": g.get("sender_name", g["sender_email"]),
-        "resume_path": g.get("resume_path", ""),
-        "cover_letter_path": g.get("cover_letter_path", ""),
-        "min_delay": float(g.get("min_delay", 30)),
-        "max_delay": float(g.get("max_delay", 90)),
+        "sender_email": get_clean("sender_email"),
+        "app_password": get_clean("app_password"),
+        "sender_name": get_clean("sender_name", g["sender_email"]),
+        "resume_path": get_clean("resume_path"),
+        "cover_letter_path": get_clean("cover_letter_path"),
+        "min_delay": float(get_clean("min_delay", "30")),
+        "max_delay": float(get_clean("max_delay", "90")),
+        "default_position": get_clean("default_position"),
     }
 
 
 def load_workbook_data(xlsx_path: str) -> list[dict]:
-    """Load rows from the first sheet of the Excel workbook."""
-    wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        raise ValueError("Excel file is empty.")
+    """Load rows from Excel workbook or CSV file."""
+    path = Path(xlsx_path)
+    if path.suffix.lower() == ".csv":
+        import csv
+        try:
+            with open(path, mode="r", encoding="utf-8-sig") as f:
+                rows = list(csv.reader(f))
+        except UnicodeDecodeError:
+            with open(path, mode="r", encoding="cp1256", errors="ignore") as f:
+                rows = list(csv.reader(f))
+    else:
+        wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        wb.close()
 
-    headers = [str(h).strip().lower() if h else f"col_{i}" for i, h in enumerate(rows[0])]
+    if not rows:
+        raise ValueError("File is empty.")
+
+    # Detect if the first row is a header row
+    first_row = rows[0]
+    has_header = False
+    
+    # Check if first cell of first row contains '@' (email address)
+    first_cell = str(first_row[0]).strip().lower() if first_row[0] is not None else ""
+    
+    header_keywords = {
+        "email", "email address", "e-mail", "mail", "البريد الإلكتروني", "البريد الالكتروني", "الايميل",
+        "position", "job title", "job_title", "title", "job", "role", "المسمى الوظيفي", "الوظيفة",
+        "company", "company name", "company_name", "organization", "firm", "اسم الشركة", "الشركة"
+    }
+    
+    if first_cell and "@" not in first_cell:
+        # If the first cell matches any header keyword, or if it doesn't look like an email
+        if first_cell in header_keywords or not any(domain in first_cell for domain in (".com", ".net", ".org", ".edu", ".gov", ".co", ".sa")):
+            has_header = True
+
+    header_mapping = {}
+    data_start_idx = 1
+    
+    if has_header:
+        raw_headers = [str(h).strip().lower() if h else f"col_{i}" for i, h in enumerate(first_row)]
+        for idx, h in enumerate(raw_headers):
+            if h in ("email", "email address", "e-mail", "mail", "البريد الإلكتروني", "البريد الالكتروني", "الايميل"):
+                header_mapping[idx] = "email"
+            elif h in ("position", "job title", "job_title", "title", "job", "role", "المسمى الوظيفي", "الوظيفة"):
+                header_mapping[idx] = "position"
+            elif h in ("company", "company name", "company_name", "organization", "firm", "اسم الشركة", "الشركة"):
+                header_mapping[idx] = "company"
+            elif h in ("status", "state", "الحالة"):
+                header_mapping[idx] = "status"
+            elif h in ("notes", "note", "comment", "ملاحظات"):
+                header_mapping[idx] = "notes"
+            else:
+                header_mapping[idx] = h
+    else:
+        # No header row. Map by index order: Column 1 is email, Column 2 is position, etc.
+        data_start_idx = 0
+        header_mapping = {
+            0: "email",
+            1: "position",
+            2: "company",
+            3: "status",
+            4: "notes"
+        }
+
     records = []
-    for row in rows[1:]:
-        record = dict(zip(headers, row))
-        # normalise key fields
-        for key in ("email", "company", "position", "status", "notes"):
-            if key in record and record[key] is not None:
-                record[key] = str(record[key]).strip()
-        records.append(record)
-    wb.close()
+    for row in rows[data_start_idx:]:
+        record = {
+            "email": "",
+            "company": "",
+            "position": "",
+            "status": "",
+            "notes": ""
+        }
+        for idx, val in enumerate(row):
+            if idx in header_mapping:
+                key = header_mapping[idx]
+                if val is not None:
+                    record[key] = str(val).strip()
+        
+        # Only add records that have at least some data (like an email)
+        if record["email"]:
+            records.append(record)
+            
     return records
 
 
@@ -94,10 +170,22 @@ def build_email(
     msg = MIMEMultipart()
     msg["From"] = f"{sender_name} <{sender_email}>"
     msg["To"] = recipient_email
-    msg["Subject"] = f"Application for {position} at {company}"
+    
+    company = (company or "").strip()
+    position = (position or "").strip()
+    
+    if company:
+        msg["Subject"] = f"Application for {position} at {company}"
+    else:
+        msg["Subject"] = f"Application for {position}"
+
+    # Prepare values for formatting the body
+    salutation = f"Dear Hiring Team at {company}" if company else "Dear Hiring Team"
+    company_at = f" at {company}" if company else ""
 
     body = body_template.format(
-        company=company,
+        salutation=salutation,
+        company_at=company_at,
         position=position,
         recipient_email=recipient_email,
     )
@@ -140,11 +228,12 @@ def send_email(
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Send job application emails from an Excel list.")
-    parser.add_argument("--xlsx", default="emails.xlsx", help="Path to the Excel file (default: emails.xlsx)")
+    parser = argparse.ArgumentParser(description="Send job application emails from an Excel or CSV list.")
+    parser.add_argument("--xlsx", default="emails.xlsx", help="Path to the Excel (.xlsx) or CSV (.csv) file (default: emails.xlsx)")
     parser.add_argument("--config", default="config.ini", help="Path to the config file (default: config.ini)")
     parser.add_argument("--dry-run", action="store_true", help="Preview emails without sending")
     parser.add_argument("--limit", type=int, default=0, help="Max number of emails to send (0 = no limit)")
+    parser.add_argument("--position", default="", help="Default job title/position to apply for")
     args = parser.parse_args()
 
     # load config
@@ -156,6 +245,7 @@ def main():
     cover_letter_path = config["cover_letter_path"]
     min_delay = config["min_delay"]
     max_delay = config["max_delay"]
+    default_position = config.get("default_position", "")
 
     # load recipients
     records = load_workbook_data(args.xlsx)
@@ -163,11 +253,11 @@ def main():
     print(f"Loaded {total} rows from {args.xlsx}")
 
     # email body template — edit this to match your style
-    body_template = """Dear Hiring Team at {company},
+    body_template = """{salutation},
 
-I am writing to express my interest in the {position} position at {company}. I believe my skills and experience make me a strong candidate for this role.
+I am writing to express my interest in the {position} position{company_at}. I believe my skills and experience make me a strong candidate for this role.
 
-I have attached my resume and cover letter for your review. I would welcome the opportunity to discuss how I can contribute to your team.
+I have attached my resume. I would welcome the opportunity to discuss how I can contribute to your team.
 
 Thank you for your time and consideration.
 
@@ -196,13 +286,19 @@ Best regards,
 
     for i, record in enumerate(records, start=1):
         email = record.get("email", "")
-        company = record.get("company", "your company")
-        position = record.get("position", "the open role")
+        company = record.get("company", "")
+        position = record.get("position", "") or args.position or default_position or "open position"
 
-        print(f"[{i}/{total}] {email} — {company} ({position})")
+        comp_display = company if company else "(no company)"
+        print(f"[{i}/{total}] {email} — {comp_display} ({position})")
 
         if should_skip(record):
-            reason = record.get("status", "missing email")
+            reason = record.get("status", "")
+            if not reason:
+                if not email or "@" not in email:
+                    reason = "missing or invalid email"
+                else:
+                    reason = "skipped"
             print(f"  SKIPPED (status: {reason})")
             skipped += 1
             continue
@@ -216,6 +312,20 @@ Best regards,
             attach_file(msg, cover_letter_path)
 
         if args.dry_run:
+            if sent == 0:
+                print(f"\n--- PREVIEW OF THE FIRST EMAIL ---")
+                print(f"Subject: {msg['Subject']}")
+                # Extract body
+                body_part = ""
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        body_part = part.get_payload()
+                        break
+                print("Body:")
+                print(body_part)
+                attachments_list = [Path(p).name for p in [resume_path, cover_letter_path] if p]
+                print(f"Attachments: {attachments_list}")
+                print(f"----------------------------------\n")
             print(f"  DRY RUN — would send to {email}")
             sent += 1
             continue
