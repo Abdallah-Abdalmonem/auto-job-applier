@@ -291,7 +291,16 @@ def save_config():
         config["max_delay"] = str(data.get("max_delay", 90))
         config["default_position"] = data.get("default_position", "").strip()
         
+        # Preserve or update file paths from payload if present
+        if "resume_path" in data:
+            config["resume_path"] = data.get("resume_path", "").strip()
+        if "cover_letter_path" in data:
+            config["cover_letter_path"] = data.get("cover_letter_path", "").strip()
+        if "xlsx_file" in data:
+            config["xlsx_file"] = data.get("xlsx_file", "").strip()
+            
         session["config"] = config
+        session.modified = True
         return jsonify({"message": "Configuration saved to browser session successfully."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -324,6 +333,7 @@ def upload_file():
         config = session.get("config", {})
         config["xlsx_file"] = filename
         session["config"] = config
+        session.modified = True
         
         return jsonify({"message": f"Sheet '{filename}' uploaded successfully.", "filename": filename})
 
@@ -338,6 +348,7 @@ def upload_file():
         config_key = "resume_path" if file_type == "resume" else "cover_letter_path"
         config[config_key] = filename
         session["config"] = config
+        session.modified = True
 
         return jsonify({"message": f"Document '{filename}' uploaded successfully.", "filename": filename})
 
