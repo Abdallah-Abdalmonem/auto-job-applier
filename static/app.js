@@ -89,6 +89,10 @@ async function loadConfig() {
         document.getElementById("default_position").value = data.default_position || "";
 
         // Update filenames UI labels if loaded from config
+        if (data.xlsx_file) {
+            activeFileNames.xlsx = data.xlsx_file;
+            document.getElementById("xlsx-filename").innerHTML = `<span class="uploaded-badge"><i class="fa-solid fa-check"></i> ${data.xlsx_file}</span>`;
+        }
         if (data.resume_path) {
             activeFileNames.resume = data.resume_path;
             document.getElementById("resume-filename").innerHTML = `<span class="uploaded-badge"><i class="fa-solid fa-check"></i> ${data.resume_path}</span>`;
